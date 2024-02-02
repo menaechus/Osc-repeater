@@ -1,4 +1,5 @@
 from pythonosc import dispatcher, osc_server, udp_client
+# from pythonosc.dispatcher import Dispatcher
 import netifaces as ni
 import threading
 import tkinter as tk
@@ -22,16 +23,23 @@ MAX_LINES = 1000
 
 def forward_osc(addr, *args):
     client.send_message(addr, args)
-    if terminal_text is not None and tk.Toplevel.winfo_exists(terminal_window):
-        terminal_text.insert(tk.END, f"Received message: {addr} {args}\n")
-        terminal_text.see(tk.END)  # Auto-scroll to the end
+    # print(f"Forwarded message: {addr} {args}")
+last_address = None
 
-        # Limit the number of lines
-        if int(terminal_text.index('end-1c').split('.')[0]) > MAX_LINES:
-            terminal_text.delete('1.0', '2.0')
+def on_message(address, *args):
+    global last_address
+    # print(f"Received message: {address} {args[0]}")
+    if terminal_text is not None:
+        if address == last_address:
+            # Delete the last line
+            terminal_text.delete("end-2l", "end-1c")
+        # Insert the new message
+        terminal_text.insert(tk.END, f"{address} {args[0]}\n")
+    last_address = address
 
 # Create a dispatcher and register the forward_osc function to it
 dispatcher = dispatcher.Dispatcher()
+dispatcher.map("*", on_message)
 dispatcher.set_default_handler(forward_osc)
 
 # Create an OSC server and client
@@ -69,7 +77,7 @@ def toggle_terminal():
         terminal_window = tk.Toplevel(root)
         terminal_window.title("Terminal")
         terminal_text = tk.Text(terminal_window)
-        terminal_text.pack()
+        terminal_text.pack(expand=True, fill='both')  # Make the Text widget fill the window
     else:
         # Destroy the window if it already exists
         terminal_window.destroy()
@@ -98,15 +106,19 @@ def load_from_json():
     try:
         with open("config.json", "r") as f:
             data = json.load(f)
-        input_port_entry.insert(0, data["input_port"])
-        output_port_entry.insert(0, data["output_port"])
+        input_port_entry.delete(0, tk.END)  # Delete existing text
+        input_port_entry.insert(0, data["input_port"])  # Insert loaded value
+        output_port_entry.delete(0, tk.END)  # Delete existing text
+        output_port_entry.insert(0, data["output_port"])  # Insert loaded value
         client._address = data["address"]
     except FileNotFoundError:
         messagebox.showerror("Error", "No config file found!")
 
-# Create a simple GUI for the IP selection
+# Create the main window
 root = tk.Tk()
-root.title("Select an IP")
+root.title("OSC Repeater")
+root.resizable(False, False)  # Prevent the window from being resized
+
 
 def select_ip():
     selection = listbox.curselection()
@@ -119,40 +131,42 @@ def select_ip():
 listbox = tk.Listbox(root)
 for ip in get_ips():
     listbox.insert(tk.END, ip)
-listbox.pack()
+listbox.pack(padx=10, pady=5)
 
-select_button = tk.Button(root, text="Select IP", command=select_ip)
-select_button.pack()
+select_button = tk.Button(root, text="Select IP", command=select_ip, padx=10, pady=5)
+select_button.pack(padx=10, pady=5)
 
 input_port_label = tk.Label(root, text="Input Port:")
-input_port_label.pack()
+input_port_label.pack(padx=10, pady=5)
 
 input_port_entry = tk.Entry(root)
 input_port_entry.insert(0, '7000')  # Set default input port
-input_port_entry.pack()
+input_port_entry.pack(padx=10, pady=5)
 
 output_port_label = tk.Label(root, text="Output Port:")
-output_port_label.pack()
+output_port_label.pack(padx=10, pady=5)
 
 output_port_entry = tk.Entry(root)
 output_port_entry.insert(0, '7001')  # Set default output port
-output_port_entry.pack()
+output_port_entry.pack(padx=10, pady=5)
 
-start_button = tk.Button(root, text="Start Server", command=start_server)
-start_button.pack()
+start_button = tk.Button(root, text="Start Server", command=start_server, padx=10, pady=5)
+start_button.pack(padx=10, pady=5)
 
-stop_button = tk.Button(root, text="Stop Server", command=stop_server)
-stop_button.pack()
+stop_button = tk.Button(root, text="Stop Server", command=stop_server, padx=10, pady=5)
+stop_button.pack(padx=10, pady=5)
 
-save_button = tk.Button(root, text="Save Config", command=save_to_json)
-save_button.pack()
+save_button = tk.Button(root, text="Save Config", command=save_to_json, padx=10, pady=5)
+save_button.pack(padx=10, pady=5)
 
-load_button = tk.Button(root, text="Load Config", command=load_from_json)
-load_button.pack()
+load_button = tk.Button(root, text="Load Config", command=load_from_json, padx=10, pady=5)
+load_button.pack(padx=10, pady=5)
 
 # Create a button to toggle the terminal window
-toggle_button = tk.Button(root, text="Toggle Terminal", command=toggle_terminal)
-toggle_button.pack()
+toggle_button = tk.Button(root, text="Toggle Terminal", command=toggle_terminal, padx=10, pady=5)
+toggle_button.pack(padx=10, pady=5)
+
+load_from_json()
 
 def on_close():
     stop_server()
